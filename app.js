@@ -219,7 +219,7 @@ function generateEmailHtml(shippingDetails, productDetails) {
           <li><strong>Product Title:</strong> ${productDetails.productTitle}</li>
           <li><strong>Quantity:</strong> ${productDetails.quantity}</li>
           <li><strong>PO #:</strong> ${productDetails.poNumber}</li>
-            <li><strong>Max Approval Amount:</strong> ${productDetails.price}$</li>
+            <li><strong>Max Approval Amount:</strong> $${productDetails.price}</li>
         </ul>
         <p>If the item is unavailable in the primary warehouse, please fulfill the order from any warehouse with available stock. Kindly send the Order Confirmation once processed.</p>
         <p>Thank you, <br/>BeHope Team</p>
