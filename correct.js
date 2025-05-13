@@ -23,10 +23,10 @@ app.post('/webhook/orders/create', async (req, res) => {
                 console.log(order)
 
         res.status(200).send('Webhook received');
-        // if (order.line_items.length > 1) {
-        //     console.log('Order contains multiple SKUs - processing manually');
-        //     return;
-        // }
+        if (order.line_items.length > 1) {
+            console.log('Order contains multiple SKUs - processing manually');
+            return;
+        }
         // 2. Extract Shipping & Product Details
         const shippingDetails = {
             name: `${order.shipping_address.first_name} ${order.shipping_address.last_name}`,
@@ -75,45 +75,6 @@ app.post('/webhook/orders/create', async (req, res) => {
         return res.status(500).send('Internal Server Error');
     }
 });
-// async function getWarehouseType(order) {
-//     try {
-//         const fulfillmentOrders = await axios.get(
-//             `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/orders/${order.id}/fulfillment_orders.json`,
-//             {
-//                 headers: {
-//                     'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_API_KEY,
-//                 },
-//             }
-//         );
-//         console.log(fulfillmentOrders)
-//         if (fulfillmentOrders.data.fulfillment_orders?.length > 0) {
-//             const fulfillmentOrder = fulfillmentOrders.data.fulfillment_orders[0];
-//             if (fulfillmentOrder.assigned_location?.name) {
-//                 return fulfillmentOrder.assigned_location.name;
-//             }
-//             if (fulfillmentOrder.assigned_location_id) {
-//                 const location = await axios.get(
-//                     `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/locations/${fulfillmentOrder.assigned_location_id}.json`,
-//                     {
-//                         headers: {
-//                             'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_API_KEY,
-//                         },
-//                     }
-//                 );
-//                 return location.data.location.name;
-//             }
-//         }
-//         const lineItem = order.line_items[0];
-//         if (lineItem.vendor) {
-//             return `${lineItem.vendor} (Vendor Fulfilled)`;
-//         }
-//         return order.shipping_lines[0]?.title || "Unknown Warehouse";
-//     } catch (error) {
-//         console.error(":x: Failed to fetch warehouse type:", error.message);
-//         return "Unknown Warehouse";
-//     }
-// }
-
 async function getWarehouseType(order) {
     try {
         const fulfillmentOrders = await axios.get(
@@ -124,51 +85,33 @@ async function getWarehouseType(order) {
                 },
             }
         );
-        
-        // Check for fulfillment orders array
-        if (fulfillmentOrders.data?.fulfillment_orders?.length > 0) {
-            const [firstFulfillmentOrder] = fulfillmentOrders.data.fulfillment_orders;
-            
-            // Check assigned_location structure
-            if (firstFulfillmentOrder.assigned_location?.name) {
-                return firstFulfillmentOrder.assigned_location.name;
+        if (fulfillmentOrders.data.fulfillment_orders?.length > 0) {
+            const fulfillmentOrder = fulfillmentOrders.data.fulfillment_orders[0];
+            if (fulfillmentOrder.assigned_location?.name) {
+                return fulfillmentOrder.assigned_location.name;
             }
-            
-            // Fallback to location ID lookup
-            if (firstFulfillmentOrder.assigned_location_id) {
+            if (fulfillmentOrder.assigned_location_id) {
                 const location = await axios.get(
-                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/locations/${firstFulfillmentOrder.assigned_location_id}.json`,
+                    `https://${process.env.SHOPIFY_STORE_URL}/admin/api/2024-01/locations/${fulfillmentOrder.assigned_location_id}.json`,
                     {
                         headers: {
                             'X-Shopify-Access-Token': process.env.SHOPIFY_ADMIN_API_KEY,
                         },
                     }
                 );
-                return location.data?.location?.name || "Unknown Location";
+                return location.data.location.name;
             }
         }
-
-        // Handle line items safely
-        if (order.line_items?.length > 0) {
-            const [firstLineItem] = order.line_items;
-            if (firstLineItem.vendor) {
-                return `${firstLineItem.vendor} (Vendor Fulfilled)`;
-            }
+        const lineItem = order.line_items[0];
+        if (lineItem.vendor) {
+            return `${lineItem.vendor} (Vendor Fulfilled)`;
         }
-
-        // Handle shipping lines safely
-        if (order.shipping_lines?.length > 0) {
-            return order.shipping_lines[0].title;
-        }
-
-        return "Unknown Warehouse";
+        return order.shipping_lines[0]?.title || "Unknown Warehouse";
     } catch (error) {
-        console.error(":x: Failed to fetch warehouse type:", error.response?.data || error.message);
+        console.error(":x: Failed to fetch warehouse type:", error.message);
         return "Unknown Warehouse";
     }
 }
-
-
 async function getProductSupplier(productId) {
     try {
         const response = await axios.get(
@@ -185,12 +128,12 @@ async function getProductSupplier(productId) {
     }
 }
 function shouldSendEmail(warehouseType, supplier, shippingCountry) {
-    // const isCanadaShipping = shippingCountry === "Canada";
-    // if (!isCanadaShipping) return false;
-    // const isBestBuySupplier = supplier === "Best Buy";
-    // if (!isBestBuySupplier) return false;
-    const isDropShipWarehouse = warehouseType === "Generic Shipping";
-    return isDropShipWarehouse
+    const isCanadaShipping = shippingCountry === "Canada";
+    if (!isCanadaShipping) return false;
+    const isBestBuySupplier = supplier === "Best Buy";
+    if (!isBestBuySupplier) return false;
+    const isDropShipWarehouse = warehouseType === "A - Dropship (Abbey Lane)";
+    return isDropShipWarehouse && isBestBuySupplier && isCanadaShipping;
 }
 const sendAutomatedEmail = async (emailHtml, poNumber) => {
     try {
@@ -204,7 +147,7 @@ const sendAutomatedEmail = async (emailHtml, poNumber) => {
         });
         const info = await transporter.sendMail({
             from: `"BeHope" <${process.env.EMAIL}>`,
-            to: ["abdullah@behope.ca", "haroon@behope.ca", "hader@behope.ca"], 
+            to: ["abdullah@behope.ca", "haroon@behope.ca", "hader@behope.ca","shahin@behope.ca", "shahana@behope.ca", "nadia@behope.ca", "orders@behope.ca"], 
             subject: `Order Request for Account #62317 - PO ${poNumber}`,
             html: emailHtml,
         });
