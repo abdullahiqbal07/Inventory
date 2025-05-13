@@ -23,10 +23,10 @@ app.post('/webhook/orders/create', async (req, res) => {
                 console.log(order)
 
         res.status(200).send('Webhook received');
-        if (order.line_items.length > 1) {
-            console.log('Order contains multiple SKUs - processing manually');
-            return;
-        }
+        // if (order.line_items.length > 1) {
+        //     console.log('Order contains multiple SKUs - processing manually');
+        //     return;
+        // }
         // 2. Extract Shipping & Product Details
         const shippingDetails = {
             name: `${order.shipping_address.first_name} ${order.shipping_address.last_name}`,
